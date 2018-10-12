@@ -1,0 +1,265 @@
+---
+title: "Assignment_5"
+output:
+html_document:
+  toc: true
+  theme: united
+github_document:
+  toc: true
+  highlight: zenburn
+---
+
+
+## Part 1 Factor Management
+```{r}
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(gapminder))
+suppressPackageStartupMessages(library(forcats))
+suppressPackageStartupMessages(library(plotly))  
+
+```
+
+
+# Elaboration for the gapminder data set
+
+__1. Drop Oceania__
+Before dropping the unused data the country and continent have 142 and 5 levels repectively. In addition, the row number before dropping is 1704.
+```{r}
+#before dropping Oceania, the number of levels of continent is 5.
+nrow(gapminder)
+Ocean_drop <- gapminder %>% 
+  filter(continent != "Oceania")
+str(Ocean_drop)
+nrow(Ocean_drop)  # Number of rows after dropping levels
+
+```
+
+After filting out the Oceania, the row number drop to 1680. By appling fct_drop on continent, only the level of continent drop to 4 by removing Oceania. And while droplevels() was applied, it applied to all the factors in the structure, therefore, the level of country drop to 140 which mean the country in Oceania were removed. And the level of continent is also reduced to 4. 
+```{r}
+# dropping unused Oceania data
+drop1 <- Ocean_drop %>% 
+  mutate(continent=fct_drop(continent))
+  str(drop1)
+  nrow(drop1)  # the row number remaining at 1680
+ 
+drop2 <- Ocean_drop %>% 
+  droplevels() 
+  str(drop2) 
+  nrow(drop2)# Number of rows after dropping levels
+```
+
+
+
+__2. Reorder the levels of `country` or `continent`__
+The continent is originally ordered alphabetically, here we used different method to reorder the levels of the continient. 
+First, we will check the original looking of the gapminder dataset before reordering. It is obviously that the continent is ordered by alphabetically. 
+
+```{r}
+levels(gapminder$continent)
+```
+
+
+Now we try to reordered the levels of the continent in the following different ways:
+
+1. Reordered by the maximum GDP per capital of each continent
+```{r, reordered by max, fig.width=6, fig.height=3}
+gapminder %>% 
+  mutate(continent=fct_reorder(continent,gdpPercap,max)) %>% 
+ggplot(aes(continent,gdpPercap)) + geom_boxplot(aes(fill=continent))
+
+# to verify that this is reordered using maximum GDP per capital of each continent, we do the following:
+
+gapminder %>% 
+  group_by(continent) %>% 
+  # calculate the maximum gdpPercap in each continent
+  summarize(
+    max_gdp = max(gdpPercap)
+  ) %>% 
+  arrange(max_gdp) %>%  # which is consistent with the order in the box plot
+ knitr::kable()
+```
+
+2. Reordered by the minimum GDP per capital of each continent
+```{r,reordered by min, fig.width=6, fig.height=3 }
+gapminder %>% 
+  mutate(continent=fct_reorder(continent,gdpPercap,min)) %>% 
+ggplot(aes(continent,gdpPercap)) + geom_boxplot(aes(fill=continent))
+
+# to verify that this is reordered using maximum GDP per capital of each continent, we do the following:
+
+gapminder %>% 
+  group_by(continent) %>% 
+  # calculate the maximum gdpPercap in each continent
+  summarize(
+    min_gdp = min(gdpPercap)
+  ) %>% 
+  arrange(min_gdp) %>%  # which is consistent with the order in the box plot
+ knitr::kable()
+```
+
+
+3. Reordered by the mean GDP per capital of each continent
+
+```{r, reordered by mean, fig.width=6, fig.height=3}
+gapminder %>% 
+  mutate(continent=fct_reorder(continent,gdpPercap,mean)) %>% 
+ggplot(aes(continent,gdpPercap)) + geom_boxplot(aes(fill=continent))
+
+
+
+gapminder %>% 
+  group_by(continent) %>% 
+  # calculate the maximum gdpPercap in each continent
+  summarize(
+    mean_gdp = mean(gdpPercap)
+  ) %>% 
+  arrange(mean_gdp) %>%  # which is consistent with the order in the box plot
+ knitr::kable()
+
+
+```
+
+
+
+## Part 2: File I/O
+
+In order to explore whether this survives the round trip of writing to file then reading back in, we filter the gapminder dataframe and get only the data from Asian country in 2007.
+
+```{r}
+
+filterdata <- gapminder %>% 
+  filter(continent == "Asia" & year == 2007) 
+
+# drop the unused level
+asiadata <- filterdata %>% 
+ droplevels() 
+# check the level of continent and country to make sure the unused data is successfully dropped.
+str(asiadata)
+```
+
+
+# `write_csv()`/`read_csv()`
+
+so now we will try to write the __asiadata__ into the csv fie and again read it out to see whether the write and read has effected the data.
+
+```{r}
+#first check the original data frame asiadata
+head(asiadata)
+
+# wirte the csv file
+write_csv(asiadata,"asiadata.csv")
+
+```
+
+Now we found out that the variable __country__ and __continent__ which used to be factor transfer into a characters after reading back from the csv file. Apart from that, the data remains unchanged.
+
+```{r}
+# read back the csv file
+ read_data <- read_csv("asiadata.csv")
+ is.factor(read_data$country)  # which is false
+ is.factor(read_data$continent)
+ is.character(read_data$country) 
+
+# now check the new read_in data
+ head(read_data)
+```
+
+
+# `saveRDS()/readRDS()`
+
+while saving and reading RDS file, the class of the data is preserved, therefore the variable continent and country returned are with class factor. 
+
+```{r}
+# save to RDS file
+saveRDS(asiadata, "asiadata.rds")
+
+# read from RDS file
+read_rdsdata <- readRDS("asiadata.rds")
+
+# check the readin data
+ head(read_rdsdata) 
+  is.factor(read_rdsdata$country)  # which is true
+  is.factor(read_rdsdata$continent)
+
+```
+
+
+# `dput()/dget()`
+
+```{r}
+# put data into file
+dput(asiadata, "asiadata.txt")
+
+# get data from text file
+data_txt <- dget("asiadata.txt")
+ 
+head(data_txt) 
+
+  is.factor(data_txt$country)  # which is true
+  is.factor(data_txt$continent)
+```
+
+This is similar to `saveRDS()/readRDS()` which preserve the class of the data and the data remains unchanged while reading in from the txt file.
+
+## Part 3: Visualization design
+
+1. In this part, I am going to remake the graph I have plotted for the previous assignment. 
+this is a graph plotted in assignment 2. In this graph, I tried to showed the gdpPerCap of each country grouped by the countinent. But this graph did not show that much useful information and it did not show any information how the gdpPercap varies with time. Therefore, we are going to replot this graph.
+
+```{r}
+ggplot(gapminder,aes(gdpPercap,continent))+
+  geom_point(aes(colour=continent,size=gdpPercap),alpha=0.4)
+```
+
+Here is the modified graph:
+
+```{r, modified graph for GDP per capital, fig.width= 8,fig.height=4}
+# get the max, min, median and mean for each contient in different year
+  new_table <-  gapminder %>% 
+  group_by(continent,year) %>% 
+summarize(
+  min_gdp = min(min(gdpPercap)),
+  max_gdp = max(max(gdpPercap)),
+  mean_gdp = mean(mean(gdpPercap)),
+  median_gdp = median(median(gdpPercap))
+)
+
+# then we need to gather the gdp together to tidy up the data
+
+tidy_table <- gather(new_table,key = "Stat_GDP", value="GDP_value", min_gdp, max_gdp,mean_gdp,median_gdp)
+# then check the new gathered table
+knitr::kable(head(tidy_table))
+
+# now the data is ready for plotting
+
+new_graph <-  tidy_table %>% 
+  ggplot(aes(x = year, y = GDP_value, color = Stat_GDP) ) +
+  facet_wrap(~continent) +
+  #use log10 in y-axis
+  scale_y_log10()+
+  geom_point()+
+  #use line to show the trend
+  geom_line()+
+  ylab("GDP distribution")+
+  ggtitle("Summarized GDP per Capital vs Year")
+  
+  new_graph
+
+
+
+```
+
+The differences between these two version are:
+
+* The graph is faceted which can easier to access the data for each continent
+* Various statistic such as maximum, minimum, mean and median were computed and the trend of each was shown instead of raw data. 
+* The trend against the year is shown.
+
+2. Next we are going to convert this graph into a plotly graph and to see the differences with `ggplot2`.
+
+```{r}
+ggplotly(new_graph)
+```
+
+
+
